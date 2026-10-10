@@ -1,36 +1,29 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DropTrust Capture
+
+An AI-assisted order capture and transaction record tool that helps small businesses turn handwritten order records, customer conversation screenshots, and manual entries into accurate, searchable digital orders and customer-accessible Trust Receipts.
+
+## Overview
+
+- **Stack:** Next.js 16 (App Router), React 19, Tailwind CSS v4, Supabase (PostgreSQL, Auth, Storage), Google Gemini (`gemini-3.8-flash`), and PayPal Orders v2 Sandbox.
+- **Package Manager:** `pnpm` (Windows: `pnpm.cmd`).
+- **Core Workflow:** Capture → Extract → Review → Confirm → Share → Track → Learn.
 
 ## Getting Started
 
-First, run the development server:
+Run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser to view the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Engineering Workflow Verification
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This repository follows the engineering and Git workflow rules documented in [`AGENTS.md`](./AGENTS.md):
 
-## Learn More
+- Dedicated feature branches for all approved milestones.
+- Strictly no direct commits or direct pushes to `main`.
+- Validation checks run before committing.
+- Automated creation of draft pull requests targeting `main`.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
