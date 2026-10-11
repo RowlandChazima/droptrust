@@ -1,7 +1,10 @@
 import React, { Suspense } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ensureMerchantBusiness, logoutAction } from "@/app/auth/actions";
+import { ensureMerchantBusiness } from "@/app/auth/actions";
+import { formatMoney } from "@/lib/money";
+import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -10,13 +13,15 @@ import {
   Store,
   Mail,
   Coins,
-  Calendar,
   Lock,
-  LogOut,
   Layers,
   ArrowRight,
   Loader2,
   AlertCircle,
+  Plus,
+  ShoppingBag,
+  DollarSign,
+  Clock,
 } from "lucide-react";
 
 async function MerchantDashboard() {
@@ -72,7 +77,6 @@ async function MerchantDashboard() {
     activeBusiness = await ensureMerchantBusiness(supabase, user);
   }
 
-  // Handle missing record if provisioning also could not locate/create it
   if (!activeBusiness) {
     return (
       <Card className="border-2 border-[var(--color-brand-gold)] bg-[#FFFDF5] p-6 sm:p-8">
@@ -91,27 +95,199 @@ async function MerchantDashboard() {
     );
   }
 
+  // Query live merchant orders for metrics & recent orders
+  const { data: recentOrders = [] } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      order_reference,
+      public_token,
+      fulfillment_status,
+      payment_status,
+      payment_method,
+      total_cents,
+      currency,
+      customer_name_snapshot,
+      created_at
+    `)
+    .eq("business_id", activeBusiness.id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  // Compute live overview metrics
+  const totalOrdersCount = recentOrders.length;
+  let confirmedSalesCents = 0;
+  let unpaidBalanceCents = 0;
+
+  recentOrders.forEach((o) => {
+    if (o.payment_status === "PAID") {
+      confirmedSalesCents += Number(o.total_cents) || 0;
+    } else {
+      unpaidBalanceCents += Number(o.total_cents) || 0;
+    }
+  });
+
   return (
     <>
       {/* Welcome Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-[var(--color-brand-gold)] border-2 border-[var(--color-ink-primary)] shadow-[0_6px_0_#1E1218]">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <Badge status="CONFIRMED" label="AUTHENTICATED" />
+            <Badge status="CONFIRMED" label="ACTIVE MERCHANT" />
             <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink-secondary)]">
-              Milestone 1 Active
+              Milestone 2 Active
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--color-ink-primary)]">
             {activeBusiness.name}
           </h1>
           <p className="text-sm font-medium text-[var(--color-ink-primary)] opacity-90">
-            Merchant session active &bull; Operating currency KES &bull; Database configuration active
+            Manual order capture active &bull; Operating currency {activeBusiness.currency || "KES"} &bull; Minor-unit integer precision
           </p>
         </div>
+
+        <Link href="/orders/new">
+          <Button className="py-2.5 px-4 flex items-center gap-2 text-sm shadow-[0_4px_0_#1E1218]">
+            <Plus className="w-4 h-4" />
+            <span>Capture New Order</span>
+          </Button>
+        </Link>
       </div>
 
-      {/* Dashboard Grid */}
+      {/* Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+        <Card className="p-5 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink-secondary)]">
+              Total Orders
+            </span>
+            <div className="w-8 h-8 rounded-full bg-[var(--color-paper-light)] border border-[var(--color-paper-stone)] flex items-center justify-center">
+              <ShoppingBag className="w-4 h-4 text-[var(--color-ink-primary)]" />
+            </div>
+          </div>
+          <span className="text-3xl font-black text-[var(--color-ink-primary)]">
+            {totalOrdersCount}
+          </span>
+          <span className="text-[11px] text-[var(--color-ink-secondary)]">
+            Itemized records in store ledger
+          </span>
+        </Card>
+
+        <Card className="p-5 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink-secondary)]">
+              Settled Collections
+            </span>
+            <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-emerald-700" />
+            </div>
+          </div>
+          <span className="text-3xl font-black font-mono text-emerald-800">
+            {formatMoney(confirmedSalesCents, activeBusiness.currency || "KES")}
+          </span>
+          <span className="text-[11px] text-[var(--color-ink-secondary)]">
+            Paid &amp; verified orders
+          </span>
+        </Card>
+
+        <Card className="p-5 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink-secondary)]">
+              Pending / Unpaid
+            </span>
+            <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-amber-700" />
+            </div>
+          </div>
+          <span className="text-3xl font-black font-mono text-[var(--color-brand-crimson)]">
+            {formatMoney(unpaidBalanceCents, activeBusiness.currency || "KES")}
+          </span>
+          <span className="text-[11px] text-[var(--color-ink-secondary)]">
+            Awaiting cash or online payment
+          </span>
+        </Card>
+      </div>
+
+      {/* Recent Orders Section */}
+      <Card className="flex flex-col gap-4 p-6">
+        <div className="flex items-center justify-between border-b-2 border-[var(--color-paper-stone)] pb-3">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-[var(--color-brand-crimson)]" />
+            <h2 className="text-lg font-bold text-[var(--color-ink-primary)]">
+              Recent Store Orders
+            </h2>
+          </div>
+          <Link
+            href="/orders"
+            className="text-xs font-bold text-[var(--color-ink-secondary)] hover:text-[var(--color-ink-primary)] flex items-center gap-1 transition-colors"
+          >
+            <span>View All</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {recentOrders.length === 0 ? (
+          <div className="py-10 text-center flex flex-col items-center justify-center gap-3">
+            <p className="text-sm text-[var(--color-ink-secondary)]">
+              No orders captured yet. Click below to create your first order record.
+            </p>
+            <Link href="/orders/new">
+              <Button size="sm" className="flex items-center gap-1.5">
+                <Plus className="w-4 h-4" />
+                <span>Create Order</span>
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-[var(--color-paper-stone)] text-[var(--color-ink-secondary)] uppercase tracking-wider">
+                  <th className="py-2.5 px-3 font-bold">Reference</th>
+                  <th className="py-2.5 px-3 font-bold">Customer</th>
+                  <th className="py-2.5 px-3 font-bold">Status</th>
+                  <th className="py-2.5 px-3 font-bold">Payment</th>
+                  <th className="py-2.5 px-3 font-bold text-right">Total</th>
+                  <th className="py-2.5 px-3 font-bold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-paper-stone)]">
+                {recentOrders.slice(0, 5).map((o) => (
+                  <tr key={o.id} className="hover:bg-[var(--color-paper-light)] transition-colors">
+                    <td className="py-3 px-3 font-mono font-bold text-[var(--color-ink-primary)]">
+                      {o.order_reference}
+                    </td>
+                    <td className="py-3 px-3 font-medium text-[var(--color-ink-primary)]">
+                      {o.customer_name_snapshot || "N/A"}
+                    </td>
+                    <td className="py-3 px-3">
+                      <Badge status={o.fulfillment_status} label={o.fulfillment_status} />
+                    </td>
+                    <td className="py-3 px-3">
+                      <Badge
+                        status={o.payment_status === "PAID" ? "CONFIRMED" : "PENDING"}
+                        label={o.payment_status}
+                      />
+                    </td>
+                    <td className="py-3 px-3 font-mono font-bold text-right text-[var(--color-ink-primary)]">
+                      {formatMoney(o.total_cents, o.currency)}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <Link href={`/orders/${o.id}`}>
+                        <Button variant="outline" size="sm" className="py-1 px-2.5 text-[11px]">
+                          View
+                        </Button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Dashboard Grid: Store Profile & System Scope */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
         {/* Business Profile Details */}
         <Card className="flex flex-col gap-5">
@@ -149,16 +325,7 @@ async function MerchantDashboard() {
                 <Coins className="w-3.5 h-3.5" /> Operating Currency
               </span>
               <span className="font-bold px-2 py-0.5 rounded-full bg-[var(--color-brand-gold)] border border-[var(--color-ink-primary)] text-xs text-[var(--color-ink-primary)]">
-                {activeBusiness.currency || "KES"} (Default)
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between py-1 border-b border-[var(--color-paper-stone)]">
-              <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink-secondary)] flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" /> Member Since
-              </span>
-              <span className="font-bold text-xs text-[var(--color-ink-primary)]">
-                {new Date(user.created_at).toLocaleDateString()}
+                {activeBusiness.currency || "KES"}
               </span>
             </div>
 
@@ -173,15 +340,15 @@ async function MerchantDashboard() {
           </div>
         </Card>
 
-        {/* Security & System Readiness Status */}
+        {/* Milestone 2 Invariants & Readiness */}
         <Card className="flex flex-col gap-5">
           <div className="flex items-center justify-between border-b-2 border-[var(--color-paper-stone)] pb-3">
             <h2 className="text-lg font-bold flex items-center gap-2 text-[var(--color-ink-primary)]">
               <Layers className="w-5 h-5 text-[var(--color-brand-crimson)]" />
-              <span>Milestone 1 Configuration Scope</span>
+              <span>Milestone 2 Invariants</span>
             </h2>
             <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[var(--color-paper-stone)] text-[var(--color-ink-primary)]">
-              Configured
+              Operational
             </span>
           </div>
 
@@ -192,10 +359,10 @@ async function MerchantDashboard() {
               </div>
               <div>
                 <h3 className="text-xs font-bold uppercase text-[var(--color-ink-primary)]">
-                  Tenancy Isolation &amp; Grants
+                  Strict Minor-Unit Integer Math
                 </h3>
                 <p className="text-xs text-[var(--color-ink-secondary)]">
-                  8 tables scoped to merchant business; financial fields restricted to stored procedures.
+                  All monetary calculations are performed in integer cents with zero floating-point math.
                 </p>
               </div>
             </div>
@@ -206,10 +373,10 @@ async function MerchantDashboard() {
               </div>
               <div>
                 <h3 className="text-xs font-bold uppercase text-[var(--color-ink-primary)]">
-                  Duplicate-Safe Store Auto-Provisioning
+                  Two-Stage Order Creation Protocol
                 </h3>
                 <p className="text-xs text-[var(--color-ink-secondary)]">
-                  Guaranteed single business record per merchant with default currency KES.
+                  Order row inserted with subtotal 0, then populated atomically via set_order_items RPC.
                 </p>
               </div>
             </div>
@@ -220,20 +387,13 @@ async function MerchantDashboard() {
               </div>
               <div>
                 <h3 className="text-xs font-bold uppercase text-[var(--color-ink-primary)]">
-                  Session Routing via proxy.js
+                  Frozen Customer Evidence Snapshots
                 </h3>
                 <p className="text-xs text-[var(--color-ink-secondary)]">
-                  Server-side Next.js 16 session refresh and protected route redirects active.
+                  Customer name, phone, address, and agreed terms frozen at capture time.
                 </p>
               </div>
             </div>
-          </div>
-
-          <div className="pt-2 border-t-2 border-[var(--color-paper-stone)] flex items-center justify-between text-xs text-[var(--color-ink-secondary)]">
-            <span>Next Scope: Manual Orders &amp; Receipts</span>
-            <span className="font-bold flex items-center gap-1 text-[var(--color-ink-primary)]">
-              Milestone 2 <ArrowRight className="w-3.5 h-3.5" />
-            </span>
           </div>
         </Card>
       </div>
@@ -255,46 +415,14 @@ function DashboardFallback() {
 export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[var(--color-paper-light)] text-[var(--color-ink-primary)]">
-      {/* Top Navigation */}
-      <header className="border-b-2 border-[var(--color-ink-primary)] bg-[var(--color-paper-card)] shadow-[0_2px_0_#1E1218]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[var(--color-brand-gold)] border-2 border-[var(--color-ink-primary)] flex items-center justify-center shadow-[0_2px_0_#1E1218]">
-              <ShieldCheck className="w-6 h-6 text-[var(--color-ink-primary)]" />
-            </div>
-            <div>
-              <span className="font-extrabold tracking-tight text-xl text-[var(--color-ink-primary)] leading-none block">
-                DropTrust
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-ink-secondary)]">
-                Merchant Portal
-              </span>
-            </div>
-          </div>
+      <Navbar activePath="/" />
 
-          <div className="flex items-center gap-4">
-            <form action={logoutAction}>
-              <Button
-                type="submit"
-                variant="outline"
-                className="py-1.5 px-3 text-xs flex items-center gap-1.5"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out</span>
-              </Button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex flex-col gap-8">
         <Suspense fallback={<DashboardFallback />}>
           <MerchantDashboard />
         </Suspense>
       </main>
 
-      {/* Footer */}
       <footer className="border-t-2 border-[var(--color-ink-primary)] bg-[var(--color-paper-card)] py-4 text-center text-xs font-medium text-[var(--color-ink-secondary)]">
         <p>DropTrust Capture &bull; Built with Next.js 16, Supabase PostgreSQL, and Design System v2</p>
       </footer>
