@@ -16,6 +16,7 @@ import {
   Layers,
   ArrowRight,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 async function MerchantDashboard() {
@@ -30,8 +31,65 @@ async function MerchantDashboard() {
     redirect("/login");
   }
 
-  // Duplicate-safe business provisioning
-  const business = await ensureMerchantBusiness(supabase, user);
+  // Query business record with distinct error handling
+  const { data: business, error: businessError } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+
+  // Handle genuine database or permission errors
+  if (businessError) {
+    console.error("[Dashboard] Database error loading merchant business:", {
+      userId: user.id,
+      code: businessError.code,
+      message: businessError.message,
+    });
+
+    return (
+      <Card className="border-2 border-[var(--color-brand-crimson)] bg-[#FDF0F3] p-6 sm:p-8">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-[var(--color-brand-crimson)] shrink-0 mt-0.5" />
+          <div className="flex flex-col gap-1">
+            <h2 className="font-bold text-lg text-[var(--color-brand-crimson)]">
+              Database Connection Error
+            </h2>
+            <p className="text-sm text-[var(--color-ink-primary)]">
+              Could not query merchant store records. Please verify database connectivity or try again shortly.
+            </p>
+            <span className="text-xs font-mono text-[var(--color-ink-secondary)] mt-2">
+              Reference Code: {businessError.code || "DB_UNAVAILABLE"}
+            </span>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // If no record exists, attempt duplicate-safe provisioning
+  let activeBusiness = business;
+  if (!activeBusiness) {
+    activeBusiness = await ensureMerchantBusiness(supabase, user);
+  }
+
+  // Handle missing record if provisioning also could not locate/create it
+  if (!activeBusiness) {
+    return (
+      <Card className="border-2 border-[var(--color-brand-gold)] bg-[#FFFDF5] p-6 sm:p-8">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-[var(--color-brand-gold)] shrink-0 mt-0.5" />
+          <div className="flex flex-col gap-1">
+            <h2 className="font-bold text-lg text-[var(--color-ink-primary)]">
+              Store Setup Required
+            </h2>
+            <p className="text-sm text-[var(--color-ink-secondary)]">
+              No store profile was found for this merchant account. Refresh or contact support to initialize your store ledger.
+            </p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -45,10 +103,10 @@ async function MerchantDashboard() {
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--color-ink-primary)]">
-            {business?.name || "Merchant Store"}
+            {activeBusiness.name}
           </h1>
           <p className="text-sm font-medium text-[var(--color-ink-primary)] opacity-90">
-            Merchant identity established &bull; Core database schema active &bull; Row Level Security enforced
+            Merchant session active &bull; Operating currency KES &bull; Database configuration active
           </p>
         </div>
       </div>
@@ -62,7 +120,9 @@ async function MerchantDashboard() {
               <Store className="w-5 h-5 text-[var(--color-brand-crimson)]" />
               <span>Merchant Business Profile</span>
             </h2>
-            <Badge status="PAID" label="VERIFIED" />
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[var(--color-paper-stone)] text-[var(--color-ink-primary)]">
+              ACTIVE
+            </span>
           </div>
 
           <div className="flex flex-col gap-3.5 text-sm">
@@ -71,7 +131,7 @@ async function MerchantDashboard() {
                 <Store className="w-3.5 h-3.5" /> Business Name
               </span>
               <span className="font-bold text-[var(--color-ink-primary)]">
-                {business?.name || "N/A"}
+                {activeBusiness.name}
               </span>
             </div>
 
@@ -89,7 +149,7 @@ async function MerchantDashboard() {
                 <Coins className="w-3.5 h-3.5" /> Operating Currency
               </span>
               <span className="font-bold px-2 py-0.5 rounded-full bg-[var(--color-brand-gold)] border border-[var(--color-ink-primary)] text-xs text-[var(--color-ink-primary)]">
-                {business?.currency || "KES"} (Default)
+                {activeBusiness.currency || "KES"} (Default)
               </span>
             </div>
 
@@ -107,7 +167,7 @@ async function MerchantDashboard() {
                 <Lock className="w-3.5 h-3.5" /> Tenancy ID
               </span>
               <span className="font-mono text-[11px] text-[var(--color-ink-secondary)] truncate max-w-[200px]">
-                {business?.id || user.id}
+                {activeBusiness.id}
               </span>
             </div>
           </div>
@@ -118,10 +178,10 @@ async function MerchantDashboard() {
           <div className="flex items-center justify-between border-b-2 border-[var(--color-paper-stone)] pb-3">
             <h2 className="text-lg font-bold flex items-center gap-2 text-[var(--color-ink-primary)]">
               <Layers className="w-5 h-5 text-[var(--color-brand-crimson)]" />
-              <span>Milestone 1 Architecture State</span>
+              <span>Milestone 1 Configuration Scope</span>
             </h2>
             <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[var(--color-paper-stone)] text-[var(--color-ink-primary)]">
-              Ready
+              Configured
             </span>
           </div>
 
@@ -132,10 +192,10 @@ async function MerchantDashboard() {
               </div>
               <div>
                 <h3 className="text-xs font-bold uppercase text-[var(--color-ink-primary)]">
-                  Row Level Security (RLS)
+                  Tenancy Isolation &amp; Grants
                 </h3>
                 <p className="text-xs text-[var(--color-ink-secondary)]">
-                  Enforced on all 8 tables. Merchant queries isolated to their own business.
+                  8 tables scoped to merchant business; financial fields restricted to stored procedures.
                 </p>
               </div>
             </div>
@@ -146,7 +206,7 @@ async function MerchantDashboard() {
               </div>
               <div>
                 <h3 className="text-xs font-bold uppercase text-[var(--color-ink-primary)]">
-                  Duplicate-Safe Business Auto-Provisioning
+                  Duplicate-Safe Store Auto-Provisioning
                 </h3>
                 <p className="text-xs text-[var(--color-ink-secondary)]">
                   Guaranteed single business record per merchant with default currency KES.
