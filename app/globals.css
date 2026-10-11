@@ -1,26 +1,179 @@
 @import "tailwindcss";
 
+@theme {
+  /* Surfaces & Canvas */
+  --color-paper-light: #FFFAF0;    /* Warm cream linen canvas (Base background) */
+  --color-paper-card: #F7EFDF;     /* Sand parchment (Card & table container background) */
+  --color-paper-muted: #EFE6D4;    /* Subtle hover & alternating row tint */
+  --color-paper-stone: #E5D9CA;    /* Soft interior dividing border */
+
+  /* Inks & Text */
+  --color-ink-primary: #1E1218;    /* Deep espresso plum (Headings, primary text, heavy borders) */
+  --color-ink-secondary: #5C434F;  /* Warm muted mauve (Labels, secondary metrics, meta text) */
+  --color-ink-faint: #96818C;      /* Disabled states, placeholders, subtle captions */
+
+  /* Brand Accents */
+  --color-brand-gold: #FECB66;     /* Warm golden honey (Primary CTA, highlights, notice tags) */
+  --color-brand-crimson: #9A1436;  /* Deep seal crimson (Secondary buttons, confirmed stamps) */
+  --color-brand-coral: #FF6F89;    /* Vibrant punch pink (Focus rings, active tabs, alerts) */
+
+  /* Semantic Status Palette */
+  --color-status-draft-bg: #F7EFDF;
+  --color-status-draft-text: #5C434F;
+  --color-status-draft-border: #E5D9CA;
+
+  --color-status-confirmed-bg: #EAF4EC;
+  --color-status-confirmed-text: #1C542B;
+  --color-status-confirmed-border: #9FD1AB;
+
+  --color-status-paid-bg: #E8F5E9;
+  --color-status-paid-text: #1B5E20;
+  --color-status-paid-border: #2E7D32;
+
+  --color-status-unpaid-bg: #FFF4E5;
+  --color-status-unpaid-text: #8A4B00;
+  --color-status-unpaid-border: #FFA726;
+
+  --color-status-uncertain-bg: #FEF7DE;
+  --color-status-uncertain-text: #664D03;
+  --color-status-uncertain-border: #FECB66;
+
+  /* Geometry & Shadows */
+  --radius-pill: 9999px;
+  --radius-card: 24px;
+  --radius-box: 12px;
+  --shadow-tactile: 0 4px #1E1218;
+  --shadow-tactile-lg: 0 8px #1E1218;
+  --shadow-tactile-sm: 0 2px #1E1218;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #FFFAF0;
+  --foreground: #1E1218;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+/* Tabular figures for money, quantities, and order references */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 3D Tactile Button Physics */
+.btn-tactile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 9999px;
+  border: 2px solid #1E1218;
+  box-shadow: 0 4px 0 #1E1218;
+  transition: transform 120ms cubic-bezier(0.2, 0.8, 0.4, 1), box-shadow 120ms cubic-bezier(0.2, 0.8, 0.4, 1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.btn-tactile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #1E1218;
+}
+
+.btn-tactile:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #1E1218;
+}
+
+.btn-tactile:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: 0 2px 0 #1E1218;
+  transform: none;
+}
+
+/* Primary Gold Variant */
+.btn-tactile-gold {
+  background-color: #FECB66;
+  color: #1E1218;
+}
+.btn-tactile-gold:hover:not(:disabled) {
+  background-color: #f7bd48;
+}
+
+/* Crimson Variant */
+.btn-tactile-crimson {
+  background-color: #9A1436;
+  color: #FFFFFF;
+}
+.btn-tactile-crimson:hover:not(:disabled) {
+  background-color: #82102d;
+}
+
+/* Outline Variant */
+.btn-tactile-outline {
+  background-color: #FFFAF0;
+  color: #1E1218;
+}
+.btn-tactile-outline:hover:not(:disabled) {
+  background-color: #F7EFDF;
+}
+
+/* Tactile Pill Input */
+.input-tactile {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border-radius: 9999px;
+  border: 2px solid #1E1218;
+  background-color: #F7EFDF;
+  color: #1E1218;
+  font-size: 0.9375rem;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.input-tactile::placeholder {
+  color: #96818C;
+}
+
+.input-tactile:focus {
+  outline: none;
+  border-color: #1E1218;
+  box-shadow: 0 0 0 3px #FF6F89;
+}
+
+.input-tactile-error {
+  border-color: #9A1436 !important;
+  box-shadow: 0 0 0 3px rgba(154, 20, 54, 0.25) !important;
+}
+
+/* Tactile Card */
+.card-tactile {
+  background-color: #F7EFDF;
+  border: 2px solid #1E1218;
+  border-radius: 20px;
+  box-shadow: 0 6px 0 #1E1218;
+}
+
+/* Accessible Reduced-Motion Settings (preserves layout transforms) */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .btn-tactile:hover,
+  .btn-tactile:active {
+    transform: none !important;
+    box-shadow: 0 4px 0 #1E1218 !important;
+  }
 }
