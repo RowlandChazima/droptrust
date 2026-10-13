@@ -22,10 +22,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Never commit directly to `main` or push changes directly to `main`.
 - Before starting work, inspect `git status`, the current branch, and the remote. Never overwrite or discard existing user changes.
-- Create a dedicated feature branch for each approved milestone or feature. Use descriptive names, such as `feat/supabase-auth` or `feat/manual-orders`.
-- Commit completed work in small, logically grouped commits with descriptive messages.
-- Push only the feature branch to the configured GitHub remote.
-- Open a **draft pull request** targeting `main` after pushing. Do not merge it, mark it ready for review, or close it without my explicit approval.
+- Create a dedicated branch for each approved milestone or feature. Use short, plain names with no prefixes, such as `receipts`, `paypal`, or `manual-orders`. Do not use `feat/`, `fix/`, `chore/` or similar.
+- Commit completed work in small, logically grouped commits. Write commit messages as plain, short sentences in the imperative, such as `Add public receipt page` or `Mask customer phone on receipts`. Do not use Conventional Commit prefixes like `feat:`, `fix(scope):` or `chore:`.
+- Push only the working branch to the configured GitHub remote.
+- Open a **draft pull request** targeting `main` after pushing. Give it a plain, short title that describes the change, such as `Public receipt page`. No prefixes, no milestone numbers, no taglines. Do not merge it, mark it ready for review, or close it without my explicit approval.
 - Never force-push, reset away user changes, amend published commits, rewrite shared history, or delete branches without my explicit approval.
 - Never commit `.env`, `.env.local`, API keys, passwords, service-role keys, private customer data, or other secrets. Check the staged diff before committing.
 - Do not execute destructive database operations, production migrations, or deployment commands without my explicit approval.
