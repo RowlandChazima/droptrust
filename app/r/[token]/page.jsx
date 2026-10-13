@@ -27,7 +27,7 @@ async function ReceiptContent({ params }) {
   const result = await getPublicReceipt(token);
 
   if (result.status === "ok") {
-    return <ReceiptCard receipt={result.receipt} />;
+    return <ReceiptCard receipt={result.receipt} token={token} />;
   }
 
   if (result.status === "revoked") {

@@ -11,8 +11,13 @@ import {
   AlertCircle,
   Ban,
   RefreshCw,
+  Banknote,
 } from "lucide-react";
-import { updateFulfillmentStatus, toggleReceiptActiveAction } from "@/lib/actions/orders";
+import {
+  updateFulfillmentStatus,
+  toggleReceiptActiveAction,
+  recordCashPaymentAction,
+} from "@/lib/actions/orders";
 import { Button } from "@/components/ui/Button";
 
 // Next valid status mapping according to the database state machine
@@ -65,6 +70,16 @@ export function OrderDetailClient({ order }) {
       const res = await updateFulfillmentStatus(order.id, nextStatus);
       if (!res.success) {
         setErrorMsg(res.error || "Failed to advance order status.");
+      }
+    });
+  };
+
+  const handleRecordCashPayment = () => {
+    setErrorMsg("");
+    startTransition(async () => {
+      const res = await recordCashPaymentAction(order.id);
+      if (!res.success) {
+        setErrorMsg(res.error || "Failed to record cash payment.");
       }
     });
   };
@@ -165,6 +180,42 @@ export function OrderDetailClient({ order }) {
           </Button>
         </div>
       </div>
+
+      {/* Cash on Delivery Settlement Action */}
+      {order.payment_method === "CASH_ON_DELIVERY" && order.payment_status === "UNPAID" && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-xl border-2 border-emerald-300 bg-emerald-50 gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-white border border-emerald-300 flex items-center justify-center shrink-0 text-emerald-700">
+              <Banknote className="w-4 h-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                Cash on Delivery
+              </span>
+              <span className="text-xs font-bold text-emerald-950">
+                Awaiting physical payment collection
+              </span>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            disabled={isPending}
+            onClick={handleRecordCashPayment}
+            className="text-xs flex items-center gap-1.5 py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white w-full sm:w-auto justify-center"
+          >
+            {isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <>
+                <Banknote className="w-3.5 h-3.5" />
+                <span>Record Cash Received</span>
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Fulfillment Status Advance Action */}
       {nextStatus && (
