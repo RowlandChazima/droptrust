@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Loader2, AlertCircle, ShieldCheck, CreditCard } from "lucide-react";
-import { formatMoney } from "@/lib/money";
+import { Loader2, AlertCircle, ShieldCheck, CreditCard, Clock } from "lucide-react";
 
 export function PayPalButtonWrapper({
   token,
@@ -12,15 +11,23 @@ export function PayPalButtonWrapper({
   onPaymentSuccess,
 }) {
   const containerRef = useRef(null);
-  const [loadingScript, setLoadingScript] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const currentAttemptIdRef = useRef(null);
+  const onPaymentSuccessRef = useRef(onPaymentSuccess);
 
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
 
+  const [loadingScript, setLoadingScript] = useState(() => Boolean(clientId));
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [pendingMessage, setPendingMessage] = useState("");
+
+  // Keep callback reference updated without triggering re-render of PayPal buttons
+  useEffect(() => {
+    onPaymentSuccessRef.current = onPaymentSuccess;
+  }, [onPaymentSuccess]);
+
   useEffect(() => {
     if (!clientId) {
-      setLoadingScript(false);
       return;
     }
 
@@ -45,8 +52,19 @@ export function PayPalButtonWrapper({
             },
             createOrder: async () => {
               setErrorMessage("");
+              setPendingMessage("");
+
+              // Generate stable attempt ID for this checkout interaction
+              const attemptId =
+                typeof crypto !== "undefined" && crypto.randomUUID
+                  ? crypto.randomUUID()
+                  : `att-${Date.now()}`;
+              currentAttemptIdRef.current = attemptId;
+
               const res = await fetch(`/api/public/receipt/${token}/paypal/create`, {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ attemptId }),
               });
               const data = await res.json();
               if (!res.ok) {
@@ -59,18 +77,33 @@ export function PayPalButtonWrapper({
             onApprove: async (data) => {
               setIsProcessing(true);
               setErrorMessage("");
+              setPendingMessage("");
               try {
                 const res = await fetch(`/api/public/receipt/${token}/paypal/capture`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ paypalOrderId: data.orderID }),
+                  body: JSON.stringify({
+                    paypalOrderId: data.orderID,
+                    attemptId: currentAttemptIdRef.current,
+                  }),
                 });
                 const result = await res.json();
                 if (!res.ok) {
                   throw new Error(result.error || "Failed to finalize PayPal capture");
                 }
-                if (onPaymentSuccess) {
-                  onPaymentSuccess(result);
+
+                // Handle pending captures (HTTP 202)
+                if (res.status === 202 || result.pending) {
+                  setPendingMessage(
+                    result.message ||
+                      "Your payment is being processed by PayPal. This receipt will update once it clears."
+                  );
+                  setIsProcessing(false);
+                  return;
+                }
+
+                if (onPaymentSuccessRef.current) {
+                  onPaymentSuccessRef.current(result);
                 } else if (typeof window !== "undefined") {
                   window.location.reload();
                 }
@@ -118,6 +151,8 @@ export function PayPalButtonWrapper({
     }
 
     let script = document.getElementById(scriptId);
+    let attachedListener = false;
+
     if (!script) {
       script = document.createElement("script");
       script.id = scriptId;
@@ -134,13 +169,17 @@ export function PayPalButtonWrapper({
       };
       document.body.appendChild(script);
     } else {
+      attachedListener = true;
       script.addEventListener("load", loadButtons);
     }
 
     return () => {
       isMounted = false;
+      if (attachedListener && script) {
+        script.removeEventListener("load", loadButtons);
+      }
     };
-  }, [clientId, token, onPaymentSuccess]);
+  }, [clientId, token]);
 
   if (!clientId) {
     return (
@@ -160,12 +199,26 @@ export function PayPalButtonWrapper({
     );
   }
 
+  const ariaCheckoutDesc = `PayPal checkout for ${orderReference || "order"} (${totalCents ? `${totalCents / 100} ${currency || "USD"}` : ""})`.trim();
+
   return (
     <div className="w-full flex flex-col gap-3">
       {errorMessage && (
         <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-red-800 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
           <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {pendingMessage && (
+        <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 font-semibold">
+            <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>Payment Processing</span>
+          </div>
+          <p className="text-[11px] text-amber-800 leading-relaxed">
+            {pendingMessage}
+          </p>
         </div>
       )}
 
@@ -179,12 +232,13 @@ export function PayPalButtonWrapper({
       {loadingScript && !isProcessing && (
         <div className="py-6 flex flex-col items-center justify-center gap-2 text-xs text-[var(--color-ink-secondary)]">
           <Loader2 className="w-5 h-5 animate-spin text-[var(--color-brand-crimson)]" />
-          <span>Loading secure PayPal checkout...</span>
+          <span>Loading secure PayPal checkout for {orderReference || "order"}...</span>
         </div>
       )}
 
       <div
         ref={containerRef}
+        aria-label={ariaCheckoutDesc}
         className={`w-full transition-opacity ${loadingScript || isProcessing ? "opacity-30 pointer-events-none" : "opacity-100"}`}
       />
 
