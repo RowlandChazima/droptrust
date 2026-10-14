@@ -7,6 +7,8 @@ import {
   parseCaptureResult,
   verifyPayPalMerchant,
   isAlreadyCaptured,
+  logPaymentReconciliationIssue,
+  resolvePaymentReconciliationIssue,
 } from "@/lib/paypal";
 
 const PRIVATE_HEADERS = {
@@ -17,63 +19,6 @@ const PRIVATE_HEADERS = {
 
 function respond(body, status = 200) {
   return NextResponse.json(body, { status, headers: PRIVATE_HEADERS });
-}
-
-async function logReconciliationIssue(supabase, {
-  orderId,
-  paypalOrderId,
-  captureId,
-  amountCents,
-  currency,
-  reason,
-  details,
-}) {
-  try {
-    const { error } = await supabase.rpc("record_payment_reconciliation_issue", {
-      p_order_id: orderId || null,
-      p_paypal_order_id: paypalOrderId || null,
-      p_capture_id: captureId || null,
-      p_amount_cents: amountCents ? Number(amountCents) : null,
-      p_currency: currency || "USD",
-      p_reason: reason,
-      p_details: details || null,
-    });
-
-    if (error) {
-      console.warn("[Reconciliation Ledger] RPC fallback to direct insert:", error.message);
-      await supabase.from("payment_reconciliation_issues").insert({
-        order_id: orderId || null,
-        paypal_order_id: paypalOrderId || null,
-        capture_id: captureId || null,
-        amount_cents: amountCents ? Number(amountCents) : null,
-        currency: currency || "USD",
-        reason,
-        details: details || null,
-      });
-    }
-  } catch (err) {
-    console.error("[Reconciliation Ledger] Failed to record issue:", err.message);
-  }
-}
-
-async function resolveReconciliationIssue(supabase, captureId) {
-  if (!captureId) return;
-  try {
-    const { error } = await supabase.rpc("resolve_payment_reconciliation_issue", {
-      p_capture_id: captureId,
-      p_resolution_details: { resolved_at: new Date().toISOString() },
-    });
-
-    if (error) {
-      await supabase
-        .from("payment_reconciliation_issues")
-        .update({ status: "RESOLVED", updated_at: new Date().toISOString() })
-        .eq("capture_id", captureId)
-        .eq("status", "OPEN");
-    }
-  } catch {
-    // Non-blocking best-effort resolution
-  }
 }
 
 export async function POST(request, { params }) {
@@ -299,7 +244,7 @@ export async function POST(request, { params }) {
         }
       );
 
-      await logReconciliationIssue(supabase, {
+      await logPaymentReconciliationIssue(supabase, {
         orderId: order.id,
         paypalOrderId,
         captureId: parsed.captureId,
@@ -344,7 +289,7 @@ export async function POST(request, { params }) {
         }
       );
 
-      await logReconciliationIssue(supabase, {
+      await logPaymentReconciliationIssue(supabase, {
         orderId: order.id,
         paypalOrderId,
         captureId: parsed.captureId,
@@ -368,7 +313,7 @@ export async function POST(request, { params }) {
     }
 
     // Mark any existing reconciliation issue for this capture as resolved
-    await resolveReconciliationIssue(supabase, parsed.captureId);
+    await resolvePaymentReconciliationIssue(supabase, parsed.captureId);
 
     return respond({
       success: true,
@@ -384,7 +329,7 @@ export async function POST(request, { params }) {
     );
 
     if (captureAttempted && !knownCaptureId && order?.id && supabase) {
-      await logReconciliationIssue(supabase, {
+      await logPaymentReconciliationIssue(supabase, {
         orderId: order.id,
         paypalOrderId,
         captureId: null,
