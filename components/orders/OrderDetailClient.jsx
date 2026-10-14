@@ -12,12 +12,19 @@ import {
   Ban,
   RefreshCw,
   Banknote,
+  Sparkles,
+  Trash2,
+  Eye,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 import {
   updateFulfillmentStatus,
   toggleReceiptActiveAction,
   recordCashPaymentAction,
+  purgeOrderImageAction,
 } from "@/lib/actions/orders";
+import { ZoomableImageViewer } from "@/components/orders/ZoomableImageViewer";
 import { Button } from "@/components/ui/Button";
 
 // Next valid status mapping according to the database state machine
@@ -29,10 +36,12 @@ const NEXT_STATUS_MAP = {
   DISPATCHED: "DELIVERED",
 };
 
-export function OrderDetailClient({ order }) {
+export function OrderDetailClient({ order, extractionRecord }) {
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [errorMsg, setErrorMsg] = useState("");
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState(false);
 
   const isReceiptActive = order.is_receipt_active !== false;
 
@@ -83,6 +92,22 @@ export function OrderDetailClient({ order }) {
       }
     });
   };
+
+  const handlePurgeImage = () => {
+    setErrorMsg("");
+    startTransition(async () => {
+      const res = await purgeOrderImageAction(order.id);
+      if (!res.success) {
+        setErrorMsg(res.error || "Failed to purge image from storage.");
+      } else {
+        setConfirmPurge(false);
+        setShowImageModal(false);
+      }
+    });
+  };
+
+  const hasStoredImage = Boolean(extractionRecord?.storage_file_path);
+  const imageApiUrl = `/api/orders/${order.id}/image`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -181,6 +206,124 @@ export function OrderDetailClient({ order }) {
         </div>
       </div>
 
+      {/* Multimodal AI Extraction & Storage Evidence Card */}
+      {extractionRecord && (
+        <div className="p-4 rounded-xl border-2 border-[var(--color-ink-primary)] bg-[var(--color-paper-card)] shadow-[0_3px_0_#1E1218] flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--color-paper-stone)] pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded bg-[var(--color-brand-gold)] border border-[var(--color-ink-primary)] text-[var(--color-ink-primary)]">
+                <Sparkles className="w-3.5 h-3.5 text-[var(--color-brand-crimson)]" />
+              </span>
+              <span className="text-xs font-bold text-[var(--color-ink-primary)]">
+                Multimodal OCR Evidence (Gemini 3.8 Flash)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                hasStoredImage
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : "bg-emerald-100 text-emerald-900 border-emerald-300"
+              }`}>
+                {hasStoredImage ? "Source Photo Active" : "Image Purged (Minimized)"}
+              </span>
+              <span className="text-[10px] font-mono text-[var(--color-ink-secondary)]">
+                Status: {extractionRecord.status}
+              </span>
+            </div>
+          </div>
+
+          {hasStoredImage ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageApiUrl}
+                  alt="Order source thumbnail"
+                  className="w-12 h-12 rounded-lg object-cover border-2 border-[var(--color-ink-primary)] bg-stone-100 shrink-0 shadow-sm cursor-pointer"
+                  onClick={() => setShowImageModal(true)}
+                />
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-[var(--color-ink-primary)]">
+                    Original Source Document
+                  </span>
+                  <span className="text-[10px] font-mono text-[var(--color-ink-secondary)] truncate max-w-xs">
+                    {extractionRecord.storage_file_path.split("/").pop()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowImageModal(true)}
+                  className="text-xs flex items-center gap-1.5 py-1.5 px-3 bg-white"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Inspect Image</span>
+                </Button>
+
+                {!confirmPurge ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmPurge(true)}
+                    className="text-xs flex items-center gap-1.5 py-1.5 px-3 text-[var(--color-brand-crimson)] hover:bg-red-50 bg-white"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Purge Image</span>
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={handlePurgeImage}
+                      className="text-xs py-1.5 px-3 bg-[var(--color-brand-crimson)] text-white hover:bg-red-800"
+                    >
+                      {isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <span>Confirm Purge</span>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmPurge(false)}
+                      className="text-xs py-1.5 px-2 bg-white"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>
+                Document photo was permanently purged from private storage to minimize customer data retention. Order line items and cryptographic receipt remain verified.
+              </span>
+            </div>
+          )}
+
+          {confirmPurge && (
+            <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-900 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+              <span>
+                Purging removes the uploaded document permanently from storage. The immutable customer snapshot, financial totals, and verified line items will remain on this order.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Cash on Delivery Settlement Action */}
       {order.payment_method === "CASH_ON_DELIVERY" && order.payment_status === "UNPAID" && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-xl border-2 border-emerald-300 bg-emerald-50 gap-3">
@@ -245,6 +388,34 @@ export function OrderDetailClient({ order }) {
               </>
             )}
           </Button>
+        </div>
+      )}
+
+      {/* Modal Zoomable Image Viewer */}
+      {showImageModal && hasStoredImage && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="relative max-w-4xl w-full flex flex-col gap-3">
+            <div className="flex items-center justify-between text-white px-1">
+              <span className="text-sm font-bold flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[var(--color-brand-gold)]" />
+                <span>Order Source Document Inspector</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowImageModal(false)}
+                className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors"
+                title="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <ZoomableImageViewer
+              src={imageApiUrl}
+              alt="Source document full view"
+              className="max-h-[80vh]"
+            />
+          </div>
         </div>
       )}
     </div>
