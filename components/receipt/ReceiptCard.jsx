@@ -16,9 +16,13 @@ import {
   CheckCircle2,
   Clock,
   Coins,
+  CreditCard,
+  Banknote,
+  AlertCircle,
 } from "lucide-react";
+import { PayPalButtonWrapper } from "@/components/receipt/PayPalButtonWrapper";
 
-export function ReceiptCard({ receipt }) {
+export function ReceiptCard({ receipt, token }) {
   const handlePrint = () => {
     if (typeof window !== "undefined") {
       window.print();
@@ -206,6 +210,55 @@ export function ReceiptCard({ receipt }) {
             </span>
           </div>
         </div>
+
+        {/* Payment Checkout Action Section (Hidden on Print) */}
+        {!isPaid && receipt.fulfillmentStatus !== "CANCELLED" && (
+          <div className="print:hidden rounded-xl border-2 border-[var(--color-ink-primary)] bg-[var(--color-paper-light)] p-4 flex flex-col gap-3 shadow-[0_3px_0_#1E1218]">
+            {receipt.paymentMethod === "PAYPAL" ? (
+              receipt.currency === "USD" ? (
+                <>
+                  <div className="flex items-center justify-between border-b border-[var(--color-paper-stone)] pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-[var(--color-brand-crimson)]" />
+                      <span className="font-bold text-xs text-[var(--color-ink-primary)]">
+                        Complete Secure Payment
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-[var(--color-brand-crimson)]">
+                      {formatMoney(receipt.totalCents, receipt.currency)}
+                    </span>
+                  </div>
+                  <PayPalButtonWrapper
+                    token={token}
+                    totalCents={receipt.totalCents}
+                    currency={receipt.currency}
+                    orderReference={receipt.orderReference}
+                  />
+                </>
+              ) : (
+                <div className="flex items-start gap-2.5 text-xs text-amber-900 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                  <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-bold">Currency Notice ({receipt.currency})</span>
+                    <span className="text-[11px] text-amber-800 leading-relaxed">
+                      PayPal checkout settles exclusively in USD. This order is priced in {receipt.currency}. Payment will be settled directly with the merchant.
+                    </span>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="flex items-start gap-2.5 text-xs text-emerald-900 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                <Banknote className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-bold">Cash on Delivery Settlement</span>
+                  <span className="text-[11px] text-emerald-800 leading-relaxed">
+                    Total payment of <span className="font-mono font-bold">{formatMoney(receipt.totalCents, receipt.currency)}</span> will be collected upon physical handover of goods.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Agreed Terms if Present */}
         {receipt.agreedTerms && (

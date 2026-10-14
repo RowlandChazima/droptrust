@@ -2,7 +2,7 @@ import React, { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ensureMerchantBusiness } from "@/app/auth/actions";
+import { ensureMerchantBusiness } from "@/lib/business";
 import { formatMoney } from "@/lib/money";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/Button";

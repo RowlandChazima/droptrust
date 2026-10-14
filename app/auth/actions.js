@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { ensureMerchantBusiness } from "@/lib/business";
 
 const loginSchema = z.object({
   email: z.string().email("Please provide a valid email address."),
@@ -20,60 +21,12 @@ const signupSchema = z.object({
 });
 
 /**
- * Ensures a merchant has a business record with default currency 'KES'.
- * Safe against race conditions and duplicate calls.
- */
-export async function ensureMerchantBusiness(supabase, user, fallbackName = "My Store") {
-  if (!user || !user.id) return null;
-
-  // 1. Check if business already exists
-  const { data: existing } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("owner_user_id", user.id)
-    .maybeSingle();
-
-  if (existing) {
-    return existing;
-  }
-
-  // 2. Insert with duplicate-safe handling
-  const businessName =
-    user.user_metadata?.business_name || fallbackName || "My Store";
-
-  const { data: created, error: insertError } = await supabase
-    .from("businesses")
-    .insert({
-      owner_user_id: user.id,
-      name: businessName,
-      currency: "KES",
-    })
-    .select()
-    .maybeSingle();
-
-  if (insertError) {
-    // If concurrent insert occurred or constraint triggered, refetch existing
-    const { data: retryData } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("owner_user_id", user.id)
-      .maybeSingle();
-
-    if (retryData) return retryData;
-
-    console.error("Failed to provision business record:", insertError);
-  }
-
-  return created;
-}
-
-/**
  * Merchant Login Server Action
  */
 export async function loginAction(prevState, formData) {
   const rawData = {
-    email: formData.get("email"),
-    password: formData.get("password"),
+    email: typeof formData.get("email") === "string" ? formData.get("email").trim().toLowerCase() : "",
+    password: typeof formData.get("password") === "string" ? formData.get("password") : "",
   };
 
   const validation = loginSchema.safeParse(rawData);
@@ -93,12 +46,16 @@ export async function loginAction(prevState, formData) {
   });
 
   if (error) {
-    return { error: error.message };
+    console.error("[Login] Authentication failure:", error.message);
+    return { error: "Invalid email or password." };
   }
 
   // Ensure business record exists
   if (data?.user) {
-    await ensureMerchantBusiness(supabase, data.user);
+    const business = await ensureMerchantBusiness(supabase, data.user);
+    if (!business) {
+      return { error: "Unable to initialize merchant store. Please try again or contact support." };
+    }
   }
 
   redirect("/");
@@ -109,9 +66,9 @@ export async function loginAction(prevState, formData) {
  */
 export async function signupAction(prevState, formData) {
   const rawData = {
-    businessName: formData.get("businessName"),
-    email: formData.get("email"),
-    password: formData.get("password"),
+    businessName: typeof formData.get("businessName") === "string" ? formData.get("businessName").trim() : "",
+    email: typeof formData.get("email") === "string" ? formData.get("email").trim().toLowerCase() : "",
+    password: typeof formData.get("password") === "string" ? formData.get("password") : "",
   };
 
   const validation = signupSchema.safeParse(rawData);
@@ -136,12 +93,16 @@ export async function signupAction(prevState, formData) {
   });
 
   if (error) {
-    return { error: error.message };
+    console.error("[Signup] Registration failure:", error.message);
+    return { error: "Unable to register account. If you already have an account, please log in." };
   }
 
   // If user signed up with immediate session
   if (data?.session && data?.user) {
-    await ensureMerchantBusiness(supabase, data.user, businessName);
+    const business = await ensureMerchantBusiness(supabase, data.user, businessName);
+    if (!business) {
+      return { error: "Account created, but store setup failed. Please log in to complete setup." };
+    }
     redirect("/");
   }
 
