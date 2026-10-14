@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPublicReceipt } from "@/lib/receipts";
+import { isValidReceiptToken } from "@/lib/privacy";
 
 // Receipts are personal documents: never cache, never index, never leak the
 // token through the Referer header.
@@ -18,16 +19,32 @@ const STATUS_CODES = {
 };
 
 export async function GET(_request, { params }) {
-  const { token } = await params;
-  const result = await getPublicReceipt(token);
+  try {
+    const { token } = await params;
 
-  const body =
-    result.status === "ok"
-      ? { status: "ok", receipt: result.receipt }
-      : { status: result.status };
+    if (!isValidReceiptToken(token)) {
+      return NextResponse.json({ status: "not_found" }, {
+        status: 404,
+        headers: PRIVATE_HEADERS,
+      });
+    }
 
-  return NextResponse.json(body, {
-    status: STATUS_CODES[result.status] ?? 500,
-    headers: PRIVATE_HEADERS,
-  });
+    const result = await getPublicReceipt(token);
+
+    const body =
+      result.status === "ok"
+        ? { status: "ok", receipt: result.receipt }
+        : { status: result.status };
+
+    return NextResponse.json(body, {
+      status: STATUS_CODES[result.status] ?? 500,
+      headers: PRIVATE_HEADERS,
+    });
+  } catch (err) {
+    console.error("[Public Receipt API] Uncaught error:", err);
+    return NextResponse.json(
+      { status: "error" },
+      { status: 500, headers: PRIVATE_HEADERS }
+    );
+  }
 }

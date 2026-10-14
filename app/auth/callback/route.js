@@ -26,7 +26,7 @@ export async function GET(request) {
       } = await supabase.auth.getUser();
 
       if (user) {
-        const { ensureMerchantBusiness } = await import("@/app/auth/actions");
+        const { ensureMerchantBusiness } = await import("@/lib/business");
         await ensureMerchantBusiness(supabase, user);
       }
 
