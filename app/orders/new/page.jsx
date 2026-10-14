@@ -2,12 +2,12 @@ import React, { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Navbar } from "@/components/layout/Navbar";
-import { ManualOrderForm } from "@/components/orders/ManualOrderForm";
+import { OrderCaptureStudio } from "@/components/orders/OrderCaptureStudio";
 import { PlusCircle, Loader2 } from "lucide-react";
 
 export const metadata = {
   title: "New Order — DropTrust Capture",
-  description: "Capture verified manual orders with line items, frozen snapshots, and trust receipts.",
+  description: "Capture verified customer orders with Gemini 3.8 Flash multimodal OCR or manual entry.",
 };
 
 async function NewOrderContent() {
@@ -40,15 +40,15 @@ async function NewOrderContent() {
           </span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--color-ink-primary)]">
-          Create Manual Order
+          Create &amp; Capture Order
         </h1>
         <p className="text-sm font-medium text-[var(--color-ink-secondary)] max-w-2xl">
-          Record customer commitments, calculate strict line totals, and generate an immutable Trust Receipt certificate.
+          Extract line items instantly with Gemini 3.8 Flash Multimodal AI or record manual commitments into immutable Trust Receipts.
         </p>
       </div>
 
-      {/* Order Form */}
-      <ManualOrderForm defaultCurrency={business?.currency || "KES"} />
+      {/* Order Studio */}
+      <OrderCaptureStudio defaultCurrency={business?.currency || "KES"} />
     </main>
   );
 }

@@ -41,7 +41,7 @@ async function OrderDetailContent({ params }) {
     redirect("/login");
   }
 
-  const { success, order, items, events, error } = await getOrder(id);
+  const { success, order, items, events, extractionRecord, error } = await getOrder(id);
 
   if (!success || !order) {
     return (
@@ -124,8 +124,8 @@ async function OrderDetailContent({ params }) {
         </div>
       </div>
 
-      {/* Interactive Client Hub (Copy Receipt Link, Advance Status) */}
-      <OrderDetailClient order={order} />
+      {/* Interactive Client Hub (Copy Receipt Link, Advance Status, Image Purge) */}
+      <OrderDetailClient order={order} extractionRecord={extractionRecord} />
 
       {/* Content Grid: Line Items & Customer Snapshot vs Financials & Audit */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
