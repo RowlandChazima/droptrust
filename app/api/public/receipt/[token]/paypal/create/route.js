@@ -9,7 +9,7 @@ const PRIVATE_HEADERS = {
   "Referrer-Policy": "no-referrer",
 };
 
-export async function POST(_request, { params }) {
+export async function POST(request, { params }) {
   try {
     const { token } = await params;
 
@@ -17,11 +17,14 @@ export async function POST(_request, { params }) {
       return NextResponse.json({ error: "Invalid receipt token" }, { status: 404, headers: PRIVATE_HEADERS });
     }
 
+    const body = await request.json().catch(() => ({}));
+    const attemptId = typeof body?.attemptId === "string" ? body.attemptId.trim() : null;
+
     const supabase = createAdminClient();
 
     const { data: order, error } = await supabase
       .from("orders")
-      .select("id, order_reference, fulfillment_status, payment_status, payment_method, currency, total_cents, is_receipt_active")
+      .select("id, order_reference, fulfillment_status, payment_status, payment_method, currency, total_cents, paypal_order_id, is_receipt_active")
       .eq("public_token", token)
       .maybeSingle();
 
@@ -75,12 +78,18 @@ export async function POST(_request, { params }) {
       return NextResponse.json({ error: "Order has no payable total" }, { status: 400, headers: PRIVATE_HEADERS });
     }
 
+    // Deterministic PayPal-Request-Id: stable for retries of the same attempt, unique across new attempts, <= 128 chars
+    const requestId = attemptId
+      ? `dt-${order.id.slice(0, 8)}-${attemptId}`.slice(0, 128)
+      : `dt-order-${order.id}`.slice(0, 128);
+
     // 1. Create order at PayPal REST API
     const paypalOrder = await createPayPalOrder({
       orderId: order.id,
       amountCents: Number(order.total_cents),
       currency: "USD",
       orderReference: order.order_reference,
+      requestId,
     });
 
     // 2. Call trusted stored procedure to assign PayPal order ID and transition to PENDING
@@ -91,7 +100,10 @@ export async function POST(_request, { params }) {
 
     if (rpcError) {
       console.error("[PayPal Create] assign_paypal_order procedure failed:", rpcError);
-      return NextResponse.json({ error: rpcError.message }, { status: 500, headers: PRIVATE_HEADERS });
+      return NextResponse.json(
+        { error: "Could not initialize order checkout. Please try again or contact the merchant." },
+        { status: 500, headers: PRIVATE_HEADERS }
+      );
     }
 
     return NextResponse.json(
@@ -101,7 +113,7 @@ export async function POST(_request, { params }) {
   } catch (err) {
     console.error("[PayPal Create] Exception:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to create PayPal checkout order" },
+      { error: "Unable to create PayPal checkout order. Please refresh and try again." },
       { status: 500, headers: PRIVATE_HEADERS }
     );
   }
